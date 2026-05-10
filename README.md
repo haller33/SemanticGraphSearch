@@ -1,6 +1,6 @@
 # SemanticGraphSearch
 
-**Frase → Palavra → Fuzzy Latin Dictionary → Pre‑translated Narsese → JSON → Graph Visualizer**
+**Frase → Word → Fuzzy Latin Dictionary → Narsese (NAL) → JSON → Graph Visualizer**
 
 This project implements a complete pipeline that takes a Portuguese (or Latin) phrase, tokenizes it, fuzzy‑matches each word against a Latin dictionary, retrieves pre‑generated Narsese (NAL) statements from a translation database, converts them to JSON, and finally sends them to a real‑time graph visualizer.
 
