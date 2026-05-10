@@ -92,12 +92,12 @@ for raw_word in $phrase; do
     fi
 
     if [ "$PLAIN_NAL" -eq 1 ]; then
-        # echo "=== NAL for word: $cleaned (mode: fuzzy) ==="
-        run_search "$LIMIT_FUZZY"  "fuzzy"  "$cleaned"
         # echo "=== NAL for word: $cleaned (mode: prefix) ==="
         run_search "$LIMIT_PREFIX" "prefix" "$cleaned"
         # echo "=== NAL for word: $cleaned (mode: definition) ==="
         run_search "$LIMIT_DEF"    "def"    "$cleaned"
+        # echo "=== NAL for word: $cleaned (mode: fuzzy) ==="
+        run_search "$LIMIT_FUZZY"  "fuzzy"  "$cleaned"
     else
         echo "Processing word: '$cleaned' (original: '$raw_word')"
         run_search "$LIMIT_FUZZY"  "fuzzy"  "$cleaned"

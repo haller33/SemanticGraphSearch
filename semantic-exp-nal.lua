@@ -10,6 +10,7 @@ local exclude_bad = false
 local output_hash = false
 local to_narsese_mode = false
 local verbose = false
+local clean_narsese_flag = false
 
 local pprint = require('pprint')
 
@@ -235,17 +236,33 @@ end
 -- ----------------------------------------------------------------------
 local function clean_narsese(raw)
     if not raw then return nil end
+
+    -- 1. Remove backticks and triple backticks (same as sed 's/`//g' and sed 's/```//g')
     local cleaned = raw:gsub("`", ""):gsub("```", "")
+
+    -- 2. Split into lines (the shell script processes each line separately)
     local lines = {}
     for line in cleaned:gmatch("[^\n]+") do
-        if line:find("<") then
-            line = "<" .. line .. ">."
-            line = line:gsub("<<", "<"):gsub(">>%.>%.", ">."):gsub(">%. %<", ">.\n<")
+        if line:match("%S") then   -- non‑empty line
+            -- 3. sed 's/^/</g'  → add '<' at the beginning
+            line = "<" .. line
+            -- 4. sed 's/$/>./g' → add '>.' at the end
+            line = line .. ">."
+            -- 5. sed 's/</</g'   → replace '<<' with '<' (if any)
+            line = line:gsub("<<", "<")
+            -- 6. sed 's/>.>./>./g' – replace '>.>.' with '>.' *repeatedly* until no more
+            while line:find(">%.") and line:find("%.>", line:find(">%.") + 1) do
+                line = line:gsub(">%.>%.", ">.")
+            end
             table.insert(lines, line)
         end
     end
-    if #lines == 0 then return nil end
-    return table.concat(lines, "\n")
+
+    -- 7. Rejoin lines, then apply the final split: sed 's/>. </>.\n</g'
+    local result = table.concat(lines, "\n")
+    result = result:gsub(">%. %<", ">.\n<")
+
+    return result
 end
 
 -- ----------------------------------------------------------------------
@@ -292,8 +309,12 @@ local function prefix_search(prefix)
         for _, row in ipairs(rows) do
           local narsese_raw = fetch_narsese_for_hash(row.word_hash)
             if narsese_raw then
-                local cleaned = clean_narsese(narsese_raw)
-                if cleaned then print(cleaned) end
+              if clean_narsese_flag then
+                 local cleaned = clean_narsese(narsese_raw)
+                 if cleaned then print(cleaned) end
+              else
+                print(narsese_raw)
+              end
             end
         end
         return
@@ -331,8 +352,12 @@ local function definition_search(text)
         for _, row in ipairs(rows) do
             local narsese_raw = fetch_narsese_for_hash(row.word_hash)
             if narsese_raw then
-                local cleaned = clean_narsese(narsese_raw)
-                if cleaned then print(cleaned) end
+              if clean_narsese_flag then
+                 local cleaned = clean_narsese(narsese_raw)
+                 if cleaned then print(cleaned) end
+              else
+                print(narsese_raw)
+              end
             end
         end
         return
@@ -365,8 +390,12 @@ local function exact_search(query)
         if row then
             local narsese_raw = fetch_narsese_for_hash(row.word_hash)
             if narsese_raw then
-                local cleaned = clean_narsese(narsese_raw)
-                if cleaned then print(cleaned) end
+              if clean_narsese_flag then
+                 local cleaned = clean_narsese(narsese_raw)
+                 if cleaned then print(cleaned) end
+              else
+                print(narsese_raw)
+              end
             end
         end
         return
@@ -407,8 +436,12 @@ local function fuzzy_and_prefix_wrapper(query, no_fuzzy)
         for h, _ in pairs(hashes) do
             local narsese_raw = fetch_narsese_for_hash(h)
             if narsese_raw then
-                local cleaned = clean_narsese(narsese_raw)
-                if cleaned then print(cleaned) end
+              if clean_narsese_flag then
+                 local cleaned = clean_narsese(narsese_raw)
+                 if cleaned then print(cleaned) end
+              else
+                print(narsese_raw)
+              end
             end
         end
         return
@@ -605,6 +638,7 @@ Usage:
   lua semantic-exp.lua --to-narsese         → fetch and output cleaned Narsese statements (for given search)
   lua semantic-exp.lua --hash-file file     → output word_hashes for each word in file (one per line)
   lua semantic-exp.lua --exclude-bad        → exclude entries with the problematic content_hash
+  lua semantic-exp.lua --clean_narsese        → exclude entries with the problematic content_hash
 ]])
 end
 
@@ -635,6 +669,9 @@ local function main(args)
             i = i + 2
         elseif args[i] == "--no-fuzzy" then
             no_fuzzy = true
+            i = i + 1
+        elseif args[i] == "--clean_narsese" then
+            clean_narsese_flag = true
             i = i + 1
         elseif args[i] == "--exact" then
             exact_mode = true
@@ -707,8 +744,12 @@ local function main(args)
             for _, r in ipairs(fuzzy_results) do
                 local narsese_raw = fetch_narsese_for_hash(r.hash)
                 if narsese_raw then
+                  if clean_narsese_flag then
                     local cleaned = clean_narsese(narsese_raw)
                     if cleaned then print(cleaned) end
+                  else
+                    print(narsese_raw)
+                  end
                 end
             end
         else
@@ -729,8 +770,12 @@ local function main(args)
             for _, r in ipairs(trigram_results) do
                 local narsese_raw = fetch_narsese_for_hash(r.hash)
                 if narsese_raw then
+                  if clean_narsese_flag then
                     local cleaned = clean_narsese(narsese_raw)
                     if cleaned then print(cleaned) end
+                  else
+                    print(narsese_raw)
+                  end
                 end
             end
         else
