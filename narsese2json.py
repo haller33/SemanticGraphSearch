@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """
 Convert Narsese statements from stdin to JSON Lines (graph operations).
-Recursively decomposes terms and creates nodes for atoms and compounds,
-plus edges representing term structure.
-
-Usage: ./narsese2json.py [--tag narsese] < input.nars
+Recursively decomposes simple inheritance; for complex statements (==>, <->, variables, etc.)
+it falls back to a top‑level relation node with an edge.
 """
 
 import sys
@@ -16,7 +14,7 @@ import signal
 signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 # ------------------------------------------------------------
-# Tokenizer
+# Tokenizer (unchanged)
 # ------------------------------------------------------------
 TOKEN_SPEC = [
     ('COMMENT',   r'//[^\n]*'),
@@ -42,7 +40,7 @@ def tokenize(code):
         yield kind, value
 
 # ------------------------------------------------------------
-# Parser
+# Parser (unchanged)
 # ------------------------------------------------------------
 class Parser:
     def __init__(self, tokens):
@@ -64,7 +62,6 @@ class Parser:
         return kind, value
 
     def parse_term(self):
-        """Parse a Narsese term (atom, compound, statement, product, etc.)"""
         kind, value = self.peek()
         if kind in ('ATOM', 'BRACE', 'BRACKET', 'NUMBER', 'VAR', 'WILDCARD'):
             self.consume()
@@ -77,10 +74,8 @@ class Parser:
             raise SyntaxError(f"Unexpected token: {kind} {value}")
 
     def parse_statement(self):
-        """Parse < ... > with a relation."""
         self.consume(expected_value='<')
         left = self.parse_term()
-        # relation operator
         rel = None
         kind, val = self.peek()
         if val in ('-->', '<->', '<=>', '==>', '=/='):
@@ -88,10 +83,8 @@ class Parser:
             self.consume()
             right = self.parse_term()
         else:
-            # standalone term inside < > (unlikely, but handle)
             right = None
         self.consume(expected_value='>')
-        # consume trailing punctuation . ? !
         if self.pos < len(self.tokens):
             kind, val = self.peek()
             if kind == 'SPECIAL' and val in ('.', '?', '!'):
@@ -99,18 +92,15 @@ class Parser:
         if rel:
             return ('stmt', left, rel, right)
         else:
-            return left  # just a term wrapped in < >
+            return left
 
     def parse_compound(self):
-        """Parse ( ... ) compound: (&&, ...), (||, ...), (--, ...), (A * B), (&/, ...) etc."""
         self.consume(expected_value='(')
-        # first token determines type
         kind, val = self.peek()
         if val in ('&&', '||', '--', '&/', '|', '&', '~'):
-            # operator compound: (&&, A, B, ...)
             op = val
             self.consume()
-            self.consume(expected_value=',')   # comma after operator
+            self.consume(expected_value=',')
             args = []
             while True:
                 arg = self.parse_term()
@@ -126,14 +116,11 @@ class Parser:
             self.consume(expected_value=')')
             return ('compound', op, args)
         else:
-            # product: A * B (or longer)
             left = self.parse_term()
             kind, val = self.peek()
             if val == '*':
-                # product chain: (A * B * C ...)
                 self.consume(expected_value='*')
                 right = self.parse_term()
-                # flatten into a list
                 args = [left, right]
                 while True:
                     nxt = self.peek()
@@ -145,12 +132,11 @@ class Parser:
                 self.consume(expected_value=')')
                 return ('product', args)
             else:
-                # just parentheses grouping
                 self.consume(expected_value=')')
                 return left
 
 # ------------------------------------------------------------
-# AST Traversal and Node/Edge Emission
+# Graph Emitter (unchanged)
 # ------------------------------------------------------------
 class GraphEmitter:
     def __init__(self, add_tag=None):
@@ -159,12 +145,9 @@ class GraphEmitter:
         self.out = sys.stdout
 
     def node_id(self, term_node):
-        """Generate a unique ID for a term node (AST representation)."""
-        # We'll use the string representation, which we define recursively
         return self.term_to_string(term_node)
 
     def term_to_string(self, term_node):
-        """Convert AST node back to Narsese source string."""
         typ = term_node[0]
         if typ == 'atom':
             return term_node[1]
@@ -185,7 +168,6 @@ class GraphEmitter:
             raise ValueError(f"Unknown term type: {typ}")
 
     def emit_node(self, term_node):
-        """Add a node for this term if not already seen."""
         nid = self.node_id(term_node)
         if nid in self.seen_nodes:
             return nid
@@ -197,7 +179,6 @@ class GraphEmitter:
         return nid
 
     def emit_edge(self, src_node, dst_node, label):
-        """Emit an add_edge operation."""
         src_id = self.node_id(src_node)
         dst_id = self.node_id(dst_node)
         op = {
@@ -211,24 +192,14 @@ class GraphEmitter:
         self.out.write(json.dumps(op) + '\n')
 
     def traverse_term(self, term_node, parent_node=None, relation_label=None):
-        """
-        Recursively emit nodes for all subterms.
-        If parent_node is given, add an edge from parent to this term.
-        """
-        # Emit node for this term
         cur_id = self.emit_node(term_node)
-
-        # If we have a parent, link it
         if parent_node is not None and relation_label is not None:
             self.emit_edge(parent_node, term_node, relation_label)
-
-        # Recurse into children based on term type
         typ = term_node[0]
         if typ == 'atom':
-            pass  # no children
+            pass
         elif typ == 'stmt':
             _, left, rel, right = term_node
-            # left and right are terms
             self.traverse_term(left, parent_node=term_node, relation_label='[subject]')
             if right:
                 self.traverse_term(right, parent_node=term_node, relation_label='[predicate]')
@@ -242,32 +213,109 @@ class GraphEmitter:
                 self.traverse_term(arg, parent_node=term_node, relation_label=f'[product_arg{i}]')
         else:
             raise ValueError(f"Unknown term type: {typ}")
-
         return cur_id
 
+    # ----------------------------------------------
+    # Fallback for complex statements (added)
+    # ----------------------------------------------
+    def process_complex_statement(self, line):
+        """
+        Fallback parser for statements that the normal parser cannot handle.
+        Extracts top‑level relation using regex, creates two atomic nodes
+        (left and right parts as literal strings) and an edge labeled with the relation.
+        """
+        # Remove trailing punctuation . ? ! for matching
+        original = line
+        punct = ''
+        if line[-1] in ('.', '?', '!'):
+            punct = line[-1]
+            line = line[:-1]
+
+        # Match outermost structure: < ... RELATION ... >
+        # We use a simple regex that finds the first '<' and the matching '>' at the same level.
+        # This is not foolproof, but works for most Narsese statements.
+        level = 0
+        start = -1
+        end = -1
+        for i, ch in enumerate(line):
+            if ch == '<':
+                if level == 0:
+                    start = i
+                level += 1
+            elif ch == '>':
+                level -= 1
+                if level == 0 and start != -1:
+                    end = i
+                    break
+        if start == -1 or end == -1:
+            sys.stderr.write(f"Fallback parse error: cannot find outer brackets in {original}\n")
+            return
+
+        inner = line[start+1:end]  # content inside <...>
+        # Find the main relation operator (we keep it simple: try known operators)
+        # Order matters: longest first
+        ops = ['==>', '<->', '-->', '<=>', '=/=']
+        rel = None
+        left = None
+        right = None
+        for op in ops:
+            # Find the operator that is not inside deeper brackets (rough heuristic: split from the rightmost occurrence)
+            # Simpler: we look for the first occurrence of op after splitting at the outermost level? We'll do a simple split.
+            # Because we don't have a full tokenizer, we assume the top‑level relation is the outermost operator.
+            # We'll take the first occurrence that is not inside parentheses (but with Narsese, it's usually the only operator at this level).
+            # Note: This may fail for nested implications like <<A --> B> ==> <C --> D>> but we'll just treat the whole inner as left/right.
+            # For simplicity, we split on the first occurrence of op.
+            parts = inner.split(op, 1)
+            if len(parts) == 2:
+                rel = op
+                left = parts[0].strip()
+                right = parts[1].strip()
+                break
+        if not rel:
+            # No operator found – treat whole inner as a single node (unlikely, but fallback)
+            left = inner
+            rel = "N/A"
+            right = ""
+
+        # Create nodes as atoms (literal strings)
+        left_node = ('atom', left)
+        right_node = ('atom', right) if right else None
+
+        # Emit nodes and edge
+        left_id = self.emit_node(left_node)
+        if right_node:
+            right_id = self.emit_node(right_node)
+            # Edge from left to right with the relation as label
+            op = {'op': 'add_edge', 'source': left_id, 'target': right_id, 'label': rel}
+            if self.add_tag:
+                op.setdefault('tags', []).append(self.add_tag)
+            self.out.write(json.dumps(op) + '\n')
+        # Also, emit the whole statement as a node? Not necessary, but if you want a root node:
+        # root_node = ('atom', f'<{inner}>')
+        # self.emit_node(root_node)
+
     def process_statement(self, line):
-        """Parse a line, then traverse the resulting AST."""
+        """Try normal parsing; if it fails, fallback to complex parsing."""
         tokens = tokenize(line)
         parser = Parser(tokens)
         try:
             term = parser.parse_term()
         except SyntaxError as e:
-            sys.stderr.write(f"Parse error: {e} on line: {line}\n")
+            # Use fallback for complex statements
+            self.process_complex_statement(line)
             return
-        # Traverse the whole AST (this creates all internal nodes and edges)
+        # Normal parsing succeeded
         self.traverse_term(term)
-        # If the term is a statement with a relation, also add the direct relation edge
         if term[0] == 'stmt' and term[2] is not None:
             _, left, rel, right = term
             if right:
-                # Add edge from left to right with relation label
                 self.emit_edge(left, right, rel)
 
 # ------------------------------------------------------------
 # Main
 # ------------------------------------------------------------
 def main():
-    parser = argparse.ArgumentParser(description='Convert Narsese to graph JSON lines (with decomposition)')
+    parser = argparse.ArgumentParser(description='Convert Narsese to graph JSON lines (with decomposition and fallback)')
     parser.add_argument('--tag', default=None, help='Add this tag to every node/edge')
     args = parser.parse_args()
 
