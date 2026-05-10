@@ -4,38 +4,53 @@
 LIMIT_FUZZY=3
 LIMIT_PREFIX=4
 LIMIT_DEF=3
-MAX_CONCURRENT_WORDS=1          # process up to 3 words simultaneously
+MAX_CONCURRENT_WORDS=1          # process up to 1 word simultaneously (adjustable)
 JOBS_PER_WORD=3                 # (fuzzy, prefix, def) – used to track total jobs
 
 TMP_PID_FILE="/tmp/semantic_pids.$$"  # unique per script run
+
+# Plain NAL mode flag (default: false)
+PLAIN_NAL=0
+
+# Parse flags
+while [ "$1" = "--plain-nal" ]; do
+    PLAIN_NAL=1
+    shift
+done
 
 # Clean word: remove leading/trailing non-alphanumeric
 clean_word() {
     echo "$1" | sed 's/^[^a-zA-Z0-9]*//; s/[^a-zA-Z0-9]*$//'
 }
 
-# Launch a single search in background, record its PID
+# Launch a single search – in plain mode it runs synchronously and prints NAL.
 run_search() {
     local limit="$1"
     local mode="$2"
     local word="$3"
-    nohup sh -c "lua ./semantic-exp-nal.lua --limit ${limit} --to-narsese --${mode} \"${word}\" | python3 narsese2json.py | uv run --with requests python send2graph.py" > "/dev/null" 2>&1 &
-    local pid=$!
-    echo "$pid" >> "$TMP_PID_FILE"
+
+    if [ "$PLAIN_NAL" -eq 1 ]; then
+        # Plain NAL mode: run in foreground, output to stdout
+        lua ./semantic-exp-nal.lua --limit "${limit}" --to-narsese "--${mode}" "${word}"
+    else
+        # Graph mode: background pipeline
+        nohup sh -c "lua ./semantic-exp-nal.lua --limit ${limit} --to-narsese --${mode} \"${word}\" | python3 narsese2json.py | uv run --with requests python send2graph.py" > "/dev/null" 2>&1 &
+        local pid=$!
+        echo "$pid" >> "$TMP_PID_FILE"
+    fi
 }
 
 # Wait until number of active background jobs is less than max
 wait_if_busy() {
     local max_total_jobs=$(( MAX_CONCURRENT_WORDS * JOBS_PER_WORD ))
     while true; do
-        # Count how many PIDs in TMP_PID_FILE are still running
         local active=0
         for pid in $(cat "$TMP_PID_FILE" 2>/dev/null); do
             if kill -0 "$pid" 2>/dev/null; then
                 active=$(( active + 1 ))
             fi
         done
-        # Remove dead PIDs from file (optional, for cleanliness)
+        # Clean dead PIDs from file
         local new_pids=""
         for pid in $(cat "$TMP_PID_FILE" 2>/dev/null); do
             if kill -0 "$pid" 2>/dev/null; then
@@ -51,7 +66,7 @@ wait_if_busy() {
     done
 }
 
-# Main: accept phrase from arguments or stdin
+# Main: accept phrase from arguments or stdin (after removing flags)
 if [ $# -eq 0 ]; then
     read -r phrase
 else
@@ -61,25 +76,39 @@ fi
 # Clean up PID file on exit
 trap 'rm -f "$TMP_PID_FILE"' EXIT
 
-# Process each word, but limit concurrency
+# Process each word
 word_count=0
 for raw_word in $phrase; do
     cleaned=$(clean_word "$raw_word")
     [ -z "$cleaned" ] || [ ${#cleaned} -lt 2 ] && continue
 
-    # Wait if we already have MAX_CONCURRENT_WORDS words processing
-    word_count=$(( word_count + 1 ))
-    if [ $word_count -gt $MAX_CONCURRENT_WORDS ]; then
-        wait_if_busy
-        word_count=1   # reset after waiting (one slot freed)
+    if [ "$PLAIN_NAL" -eq 0 ]; then
+        # Graph mode: concurrency control
+        word_count=$(( word_count + 1 ))
+        if [ $word_count -gt $MAX_CONCURRENT_WORDS ]; then
+            wait_if_busy
+            word_count=1
+        fi
     fi
 
-    echo "Processing word: '$cleaned' (original: '$raw_word')"
-    run_search "$LIMIT_FUZZY"  "fuzzy"  "$cleaned"
-    run_search "$LIMIT_PREFIX" "prefix" "$cleaned"
-    run_search "$LIMIT_DEF"    "def"    "$cleaned"
+    if [ "$PLAIN_NAL" -eq 1 ]; then
+        # echo "=== NAL for word: $cleaned (mode: fuzzy) ==="
+        run_search "$LIMIT_FUZZY"  "fuzzy"  "$cleaned"
+        # echo "=== NAL for word: $cleaned (mode: prefix) ==="
+        run_search "$LIMIT_PREFIX" "prefix" "$cleaned"
+        # echo "=== NAL for word: $cleaned (mode: definition) ==="
+        run_search "$LIMIT_DEF"    "def"    "$cleaned"
+    else
+        echo "Processing word: '$cleaned' (original: '$raw_word')"
+        run_search "$LIMIT_FUZZY"  "fuzzy"  "$cleaned"
+        run_search "$LIMIT_PREFIX" "prefix" "$cleaned"
+        run_search "$LIMIT_DEF"    "def"    "$cleaned"
+    fi
 done
 
-# Wait for all remaining background jobs to finish
-wait
-echo "All searches launched and completed."
+if [ "$PLAIN_NAL" -eq 0 ]; then
+    wait
+    echo "All searches launched and completed."
+# else
+    # echo "All NAL statements printed."
+fi
