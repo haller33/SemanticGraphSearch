@@ -1,6 +1,7 @@
 #!/usr/bin/env sh
 
-grep '^Derived:' |
+grep -v -e 'Input: ' -e 'Selected: ' | 
+    grep '^Derived:' |
     sed 's/^Derived: //' |
     sed 's/\. Priority=.*/>./' |
     grep -v '^$'
