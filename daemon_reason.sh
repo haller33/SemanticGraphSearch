@@ -46,7 +46,8 @@ start_services() {
     echo "Service 2 (input → NAR → derived.nal) PID: $PID2"
 
     # 3. Filter derived.nal, extract derived statements, send to graph (tag 'derived', red color)
-    tail -f "$DERIVED_FILE" | "$FILTER_SCRIPT" --min-confidence 0.4 --min-priority 0.8 |
+    tail -f "$DERIVED_FILE" |
+        # "$FILTER_SCRIPT" --min-confidence 0.02 --min-priority 0.02 |
         "$EXTRACT_SCRIPT" | python3 narsese2json.v2.py --tag derived |
         uv run --with requests python send2graph.py --color "#ff0000" &
     PID3=$!
