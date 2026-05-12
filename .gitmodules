@@ -7,3 +7,6 @@
 [submodule "RealtimeGraphVisualizer"]
 	path = RealtimeGraphVisualizer
 	url = https://github.com/haller33/RealtimeGraphVisualizer
+[submodule "morpheus-perseids"]
+	path = morpheus-perseids
+	url = https://github.com/haller33/morpheus-perseids
