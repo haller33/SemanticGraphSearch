@@ -2,15 +2,17 @@
 -- semantic-exp.lua – Latin dictionary searcher + Narsese fetching
 -- Added --to-narsese flag to retrieve and clean Narsese from translations DB.
 
-local DB_PATH = "latin_portuguese.4accb9e9ffd47e0856d7d7957f6548cbe531d8701d42c211431f746e6c2ada8a.db"
+local DB_PATH = "dicionariolatino.com/latin_portuguese.4accb9e9ffd47e0856d7d7957f6548cbe531d8701d42c211431f746e6c2ada8a.db"
 local TRANS_DB_PATH = "latin_to_narsese/narseses_latim_portugues.db"
 local MAX_RESULTS = 20
 local BAD_CONTENT_HASH = "32aaccb0c4597738cc2fca23b28557802587b9a9fa91d5c8c54beae8aedee5d9"
 local exclude_bad = false
 local output_hash = false
+local C_LIB_PATH = "bin/fuzzy.so"
 local to_narsese_mode = false
 local verbose = false
 local clean_narsese_flag = false
+local use_c_fuzzy = false -- Toggle for C acceleration
 
 local pprint = require('pprint')
 
@@ -72,6 +74,7 @@ local function escape(s)
     return s:gsub("'", "''")
 end
 
+
 -- ----------------------------------------------------------------------
 -- Helper: add exclusion condition to WHERE clause
 -- ----------------------------------------------------------------------
@@ -86,6 +89,48 @@ local function add_exclusion(where_clause)
         return where_clause or ""
     end
 end
+
+-- ----------------------------------------------------------------------
+-- OPTIONAL C LIBRARY ACCELERATION
+-- ----------------------------------------------------------------------
+local fuzzy_c = nil
+local c_metadata_cache = {} -- Maps word -> {definition, hash}
+
+local function load_fuzzy_c()
+    local dir = C_LIB_PATH:match("(.*)/") or "."
+    local orig_cpath = package.cpath
+    package.cpath = dir .. "/?.so;" .. dir .. "/?.dll;" .. orig_cpath
+    local ok, lib = pcall(require, "fuzzy")
+    package.cpath = orig_cpath
+    return ok and lib or nil
+end
+
+local function init_c_fuzzy()
+    fuzzy_c = load_fuzzy_c()
+    if not fuzzy_c then
+        if verbose then io.stderr:write("Warning: C fuzzy library not found at " .. C_LIB_PATH .. "\n") end
+        return false
+    end
+
+    local words = {}
+    local sql = "SELECT word, definition, word_hash FROM dictionary"
+    local cursor = dict_db:execute(sql)
+    local row = cursor:fetch({}, "a")
+    while row do
+        table.insert(words, row.word)
+        -- Store metadata to satisfy the original script's output contract
+        c_metadata_cache[row.word] = { definition = row.definition, hash = row.word_hash }
+        row = cursor:fetch({}, "a")
+    end
+    cursor:close()
+
+    if fuzzy_c.init(words) then
+        if verbose then print("C fuzzy search initialized with " .. #words .. " words") end
+        return true
+    end
+    return false
+end
+
 
 -- ----------------------------------------------------------------------
 -- Fuzzy matching (Levenshtein distance)
@@ -119,6 +164,28 @@ end
 -- ----------------------------------------------------------------------
 local function fuzzy_search(input, max_results)
     local results = {}
+
+    -- BRANCH: C Library Acceleration
+    if use_c_fuzzy or fuzzy_c then
+        local c_results = fuzzy_c.search(input, max_results)
+        for _, r in ipairs(c_results) do
+            local word = r.word
+            local max_len = math.max(#input, #word)
+            local score = (max_len > 0) and (r.score / max_len) or 1
+            
+            if score < 0.45 then
+                local meta = c_metadata_cache[word]
+                table.insert(results, {
+                    word = word,
+                    def = meta and meta.definition or "",
+                    score = score,
+                    hash = meta and meta.hash or ""
+                })
+            end
+        end
+        return results
+    end
+
     local rows = query_dict_rows("SELECT word, definition, content_hash, word_hash FROM dictionary")
     for _, row in ipairs(rows) do
         if not (exclude_bad and row.content_hash == BAD_CONTENT_HASH) then
@@ -623,22 +690,23 @@ end
 local function show_usage()
     print([[
 Usage:
-  lua semantic-exp.lua                      → interactive REPL
-  lua semantic-exp.lua --limit N "word"     → set limit to N for that search
-  lua semantic-exp.lua "word"               → exact + prefix + fuzzy (default)
-  lua semantic-exp.lua --exact "word"       → only exact match
-  lua semantic-exp.lua --no-fuzzy "word"    → exact + prefix (no fuzzy)
-  lua semantic-exp.lua --prefix "pref"      → list words starting with 'pref'
-  lua semantic-exp.lua --fuzzy "word"       → fuzzy search only (Levenshtein)
-  lua semantic-exp.lua --trigram "word"     → trigram similarity search (Jaccard)
-  lua semantic-exp.lua --def "text"         → search inside definitions
-  lua semantic-exp.lua --html "word"        → output raw HTML for that word
-  lua semantic-exp.lua --hash "word"        → output the word_hash for the exact word (single)
-  lua semantic-exp.lua --show-hash          → show word_hash instead of word/definition for any search
-  lua semantic-exp.lua --to-narsese         → fetch and output cleaned Narsese statements (for given search)
-  lua semantic-exp.lua --hash-file file     → output word_hashes for each word in file (one per line)
-  lua semantic-exp.lua --exclude-bad        → exclude entries with the problematic content_hash
-  lua semantic-exp.lua --clean_narsese        → exclude entries with the problematic content_hash
+  lua semantic-exp-nal.lua                      → interactive REPL
+  lua semantic-exp-nal.lua --limit N "word"     → set limit to N for that search
+  lua semantic-exp-nal.lua "word"               → exact + prefix + fuzzy (default)
+  lua semantic-exp-nal.lua --exact "word"       → only exact match
+  lua semantic-exp-nal.lua --no-fuzzy "word"    → exact + prefix (no fuzzy)
+  lua semantic-exp-nal.lua --prefix "pref"      → list words starting with 'pref'
+  lua semantic-exp-nal.lua --fuzzy "word"       → fuzzy search only (Levenshtein)
+  lua semantic-exp-nal.lua --trigram "word"     → trigram similarity search (Jaccard)
+  lua semantic-exp-nal.lua --def "text"         → search inside definitions
+  lua semantic-exp-nal.lua --html "word"        → output raw HTML for that word
+  lua semantic-exp-nal.lua --hash "word"        → output the word_hash for the exact word (single)
+  lua semantic-exp-nal.lua --show-hash          → show word_hash instead of word/definition for any search
+  lua semantic-exp-nal.lua --to-narsese         → fetch and output cleaned Narsese statements (for given search)
+  lua semantic-exp-nal.lua --hash-file file     → output word_hashes for each word in file (one per line)
+  lua semantic-exp-nal.lua --exclude-bad        → exclude entries with the problematic content_hash
+  lua semantic-exp-nal.lua --clean_narsese        → exclude entries with the problematic content_hash
+  lua semantic-exp-nal.lua --fuzzy-c          → fuzzy c library
 ]])
 end
 
@@ -667,6 +735,9 @@ local function main(args)
                 print("Invalid --limit value. Using default " .. MAX_RESULTS)
             end
             i = i + 2
+        elseif args[i] == "--fuzzy-c" or args[i] == "--lib-c" then
+          use_c_fuzzy = true
+          i = i + 1
         elseif args[i] == "--no-fuzzy" then
             no_fuzzy = true
             i = i + 1
@@ -734,6 +805,8 @@ local function main(args)
     end
     MAX_RESULTS = limit
 
+    if use_c_fuzzy then init_c_fuzzy() end
+      
     if #new_args == 0 then
         repl()
     elseif new_args[1] == "--prefix" and #new_args >= 2 then
