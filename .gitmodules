@@ -10,3 +10,6 @@
 [submodule "morpheus-perseids"]
 	path = morpheus-perseids
 	url = https://github.com/haller33/morpheus-perseids
+[submodule "OpenNARS-for-Applications"]
+	path = OpenNARS-for-Applications
+	url = git@github.com:haller33/OpenNARS-for-Applications.git
