@@ -15,3 +15,5 @@ tail -f derived.nal | sh extract_derived.sh | python3 narsese2json.py | uv run -
 
   
 sh semantic.sh --plain-nal $1 |  sh clean_narseses.sh >> input.nal
+
+echo "done"
