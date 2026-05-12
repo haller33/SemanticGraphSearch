@@ -1,22 +1,19 @@
-// fuzzy.c – fast fuzzy string matching library for Lua
-// Compile: clang -shared -O3 -fPIC -o fuzzy.so fuzzy.c -I/usr/include/lua5.3 -llua5.3
-// (adjust include path if necessary)
+// fuzzy.c – fast fuzzy search for Lua 5.2+
+// Compile: see build.sh
 
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 #include "lua.h"
 #include "lauxlib.h"
 #include "lualib.h"
 
-// ---------- Levenshtein distance (optimized) ----------
+// ---------- Levenshtein distance ----------
 static int levenshtein(const char *s, const char *t) {
     size_t n = strlen(s);
     size_t m = strlen(t);
     if (n == 0) return m;
     if (m == 0) return n;
 
-    // Use two rows to save memory
     int v0[m + 1];
     int v1[m + 1];
     for (size_t j = 0; j <= m; j++)
@@ -31,7 +28,6 @@ static int levenshtein(const char *s, const char *t) {
             int sub = v0[j] + cost;
             v1[j + 1] = (del < ins) ? (del < sub ? del : sub) : (ins < sub ? ins : sub);
         }
-        // swap rows
         for (size_t j = 0; j <= m; j++)
             v0[j] = v1[j];
     }
@@ -46,7 +42,6 @@ typedef struct {
 
 static WordDict dict = {NULL, 0};
 
-// ---------- Helper functions ----------
 static void free_dict(void) {
     if (dict.words) {
         for (int i = 0; i < dict.count; i++)
@@ -59,9 +54,9 @@ static void free_dict(void) {
 
 // ---------- Lua API ----------
 static int l_init_dict(lua_State *L) {
-    free_dict(); // clear previous dictionary
+    free_dict();
     luaL_checktype(L, 1, LUA_TTABLE);
-    int n = lua_objlen(L, 1);
+    int n = luaL_len(L, 1);           // Lua 5.2+ compatible
     if (n == 0) {
         lua_pushboolean(L, 1);
         return 1;
@@ -95,7 +90,6 @@ static int l_search(lua_State *L) {
         return 1;
     }
 
-    // Compute scores for all words
     typedef struct {
         const char *word;
         int score;
@@ -108,7 +102,6 @@ static int l_search(lua_State *L) {
         items[i].idx = i;
     }
 
-    // Partial sort: find best `max_results` scores (lower is better)
     int limit = (max_results < dict.count) ? max_results : dict.count;
     for (int i = 0; i < limit; i++) {
         int best = i;
@@ -123,13 +116,12 @@ static int l_search(lua_State *L) {
         }
     }
 
-    // Build result table
     lua_newtable(L);
     for (int i = 0; i < limit; i++) {
         lua_newtable(L);
         lua_pushstring(L, items[i].word);
         lua_setfield(L, -2, "word");
-        lua_pushnumber(L, items[i].score);
+        lua_pushinteger(L, items[i].score);
         lua_setfield(L, -2, "score");
         lua_rawseti(L, -2, i + 1);
     }
