@@ -2,6 +2,6 @@
 
 echo '###########################################'
 
-sh semantic.sh --plain-nal $1 | sh clean_narseses.sh |  ./OpenNARS-for-Applications/NAR shell 
+sh semantic.sh --plain-nal $1 | sh clean_narseses.sh |  ../OpenNARS-for-Applications/NAR shell 
 
 echo '###########################################'
