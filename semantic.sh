@@ -9,7 +9,7 @@ JOBS_PER_WORD=3                 # (fuzzy, prefix, def) – used to track total j
 
 USE_FUZZY_C_LIBRARY=1
 
-USE_MORPHOLOGY=1
+USE_MORPHOLOGY=0
 
 TMP_PID_FILE="/tmp/semantic_pids.$$"  # unique per script run
 
@@ -65,11 +65,11 @@ run_search() {
     else
         # Graph mode: background pipeline
         if [ "$USE_FUZZY_C_LIBRARY" -eq 1 ]; then
-            nohup sh -c "lua ./semantic-exp-nal.lua --fuzzy-c --limit ${limit} --to-narsese --${mode} \"${word}\" | python3 narsese2json.v2.py --tag input | uv run --with requests python send2graph.py" > "/dev/null" 2>&1 &
+            nohup sh -c "lua ./semantic-exp-nal.lua --fuzzy-c --limit ${limit} --to-narsese --${mode} \"${word}\" | python3 narsese2json.v3.py --tag input | uv run --with requests python send2graph.py" > "/dev/null" 2>&1 &
             local pid=$!
             echo "$pid" >> "$TMP_PID_FILE"
         else
-            nohup sh -c "lua ./semantic-exp-nal.lua --limit ${limit} --to-narsese --${mode} \"${word}\" | python3 narsese2json.v2.py --tag input | uv run --with requests python send2graph.py" > "/dev/null" 2>&1 &
+            nohup sh -c "lua ./semantic-exp-nal.lua --limit ${limit} --to-narsese --${mode} \"${word}\" | python3 narsese2json.v3.py --tag input | uv run --with requests python send2graph.py" > "/dev/null" 2>&1 &
             local pid=$!
             echo "$pid" >> "$TMP_PID_FILE"
         fi
@@ -141,7 +141,7 @@ for raw_word in $phrase; do
         run_search "$LIMIT_DEF"    "def"    "$cleaned"
     fi
 
-    if [ "{USE_MORPHOLOGY}" -eq 1 ]; then
+    if [ "${USE_MORPHOLOGY}" -eq 1 ]; then
         run_morphology "$cleaned"
     fi
 done
