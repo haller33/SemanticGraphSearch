@@ -45,22 +45,22 @@
 // --- EXEMPLOS DE TRADUÇÃO E MAPEAMENTO ---
 
 // "Gato" é um substantivo que denota um objeto (Continuant)
-< {gato} --> substantivo >.
-< ({gato} * continuant) --> denota >.
+// < {gato} --> substantivo >.
+// < ({gato} * continuant) --> denota >.
 
 // "Correr" é um verbo que denota um processo (Occurrent)
-< {correr} --> verbo >.
-< ({correr} * process) --> denota >.
+// < {correr} --> verbo >.
+// < ({correr} * process) --> denota >.
 
 // "Rápido" é um advérbio que modifica o processo
-< {rapido} --> adverbio >.
-< ({rapido} * {correr}) --> modifica >.
+// < {rapido} --> adverbio >.
+// < ({rapido} * {correr}) --> modifica >.
 
 // "Sobre" (preposição) mapeia uma relação de localização
-< {sobre} --> preposicao >.
-< ({sobre} * spatial_region) --> mapeia_para >.
+// < {sobre} --> preposicao >.
+// < ({sobre} * spatial_region) --> mapeia_para >.
 
 // Exemplo de inferência composta: "O gato rápido corre sobre o tapete"
 // O sistema "cola" as classes: Gato(Cont) + Rápido(Qual) + Correr(Occ) + Sobre(Rel)
-< (&&, <{gato} --> continuant>, <({gato} * {correr}) --> participates_in>) >.
-< ({correr} * {tempo_agora}) --> occupies >.
+// < (&&, <{gato} --> continuant>, <({gato} * {correr}) --> participates_in>) >.
+// < ({correr} * {tempo_agora}) --> occupies >.
