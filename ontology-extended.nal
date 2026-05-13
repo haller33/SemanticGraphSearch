@@ -1,0 +1,66 @@
+// --- EXTENSÃO LINGUÍSTICA PARA BFO (NAL) ---
+
+// Definição da Categoria de Linguagem
+< linguagem --> generically_dependent_continuant >.
+< entidade_linguistica --> linguagem >.
+
+// Classes Gramaticais (Part-of-Speech) como subcategorias de Entidade Linguística
+< substantivo --> entidade_linguistica >.
+< verbo --> entidade_linguistica >.
+< adjetivo --> entidade_linguistica >.
+< adverbio --> entidade_linguistica >.
+< preposicao --> entidade_linguistica >.
+
+// --- O "GLUE" (COLA) ONTOLÓGICO-GRAMATICAL ---
+// Relaciona classes gramaticais às categorias fundamentais da BFO
+
+// Substantivos geralmente denotam Continuantes (Objetos, Lugares)
+< (substantivo * continuant) --> denota >.
+
+// Verbos geralmente denotam Ocorrentes (Processos, Eventos)
+< (verbo * occurrent) --> denota >.
+
+// Adjetivos geralmente denotam Qualidades ou Papéis (Dependentes)
+< (adjetivo * specifically_dependent_continuant) --> descreve >.
+
+// Advérbios qualificam Processos (Ocorrentes)
+< (adverbio * occurrent) --> modifica >.
+
+// Preposições denotam Relações Espaciais ou Temporais
+< (preposicao * spatial_region) --> mapeia_para >.
+< (preposicao * temporal_region) --> mapeia_para >.
+
+// --- REGRAS DE INFERÊNCIA PARA O MOTOR (Lógica de Segunda Ordem) ---
+
+// Se um termo é um substantivo, o motor de inferência assume que ele busca um Continuante
+< < $1 --> substantivo > ==> < $1 --> continuant > >.
+
+// Se um termo é um verbo, o motor de inferência assume que ele descreve um Processo
+< < $1 --> verbo > ==> < $1 --> process > >.
+
+// Regra de Ligação: Atributo Gramatical -> Propriedade Ontológica
+// Se a palavra $1 descreve a entidade $2, então $2 possui a qualidade $1
+< (&&, < $1 --> adjetivo >, < ($1 * $2) --> descreve >) ==> < $2 --> [ $1 ] > >.
+
+// --- EXEMPLOS DE TRADUÇÃO E MAPEAMENTO ---
+
+// "Gato" é um substantivo que denota um objeto (Continuant)
+< {gato} --> substantivo >.
+< ({gato} * continuant) --> denota >.
+
+// "Correr" é um verbo que denota um processo (Occurrent)
+< {correr} --> verbo >.
+< ({correr} * process) --> denota >.
+
+// "Rápido" é um advérbio que modifica o processo
+< {rapido} --> adverbio >.
+< ({rapido} * {correr}) --> modifica >.
+
+// "Sobre" (preposição) mapeia uma relação de localização
+< {sobre} --> preposicao >.
+< ({sobre} * spatial_region) --> mapeia_para >.
+
+// Exemplo de inferência composta: "O gato rápido corre sobre o tapete"
+// O sistema "cola" as classes: Gato(Cont) + Rápido(Qual) + Correr(Occ) + Sobre(Rel)
+< (&&, <{gato} --> continuant>, <({gato} * {correr}) --> participates_in>) >.
+< ({correr} * {tempo_agora}) --> occupies >.
