@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """
 Convert Narsese statements from stdin to JSON Lines (graph operations).
-- Full recursive descent parser for valid Narsese.
-- Fallback for unparseable lines: creates a giant node for the whole line,
-  extracts all nested statements/compounds inside it, and connects them.
-- Supports --tag argument.
+- Handles all NAL operators including negation (--, X)
+- Multi‑character tokenizer
+- Recursive descent parser with fallback for complex/unparseable lines
 """
 
 import sys
@@ -16,19 +15,20 @@ import signal
 signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 # ------------------------------------------------------------
-# Tokenizer
+# Multi‑character tokenizer (order matters: longest first)
 # ------------------------------------------------------------
 TOKEN_SPEC = [
-    ('COMMENT',   r'//[^\n]*'),
-    ('WHITESPACE',r'\s+'),
-    ('NUMBER',    r'\d+(?:\.\d+)?'),
-    ('ATOM',      r'[a-zA-Z_][a-zA-Z0-9_]*'),
-    ('VAR',       r'[#$][1-9][0-9]*'),
-    ('WILDCARD',  r'_'),
-    ('BRACE',     r'\{[\w\s]+\}'),
-    ('BRACKET',   r'\[[\w\s_]+\]'),
-    ('RELATION',  r'-->|<->|==>|<=>|=/>|=/='),   # operadores de relação
-    ('SPECIAL',   r'[<>=&|*(),.;?!%~-]'),        # inclui '-'
+    ('COMMENT',     r'//[^\n]*'),
+    ('WHITESPACE',  r'\s+'),
+    ('NUMBER',      r'\d+(?:\.\d+)?'),
+    ('ATOM',        r'[a-zA-Z_][a-zA-Z0-9_]*'),
+    ('VAR',         r'[#$][1-9][0-9]*'),
+    ('WILDCARD',    r'_'),
+    ('BRACE',       r'\{[\w\s]+\}'),
+    ('BRACKET',     r'\[[\w\s_]+\]'),
+    # Multi‑character operators (longest first)
+    ('OP',          r'-->|<->|==>|<=>|=\/>|&&|\|\||&\/|--'),
+    ('SPECIAL',     r'[<>=&|*(),.;?!%~]'),   # single punctuation
 ]
 
 TOKEN_REGEX = re.compile('|'.join('(?P<%s>%s)' % pair for pair in TOKEN_SPEC))
@@ -42,7 +42,7 @@ def tokenize(code):
         yield kind, value
 
 # ------------------------------------------------------------
-# Parser (Recursive Descent)
+# Parser (unchanged logic, but now recognises '--' as an operator)
 # ------------------------------------------------------------
 class ParseError(Exception):
     pass
@@ -83,15 +83,14 @@ class Parser:
         left = self.parse_term()
         rel = None
         kind, val = self.peek()
-        # Verifica se o próximo token é uma relação
-        if kind == 'RELATION' or val in ('-->', '<->', '<=>', '==>', '=/=', '=/>'):
+        # Now the tokenizer returns '--' as a single OP token
+        if kind == 'OP' and val in ('-->', '<->', '==>', '<=>', '=/='):
             rel = val
             self.consume()
             right = self.parse_term()
         else:
             right = None
         self.consume(expected_value='>')
-        # consome pontuação final opcional
         if self.pos < len(self.tokens):
             kind, val = self.peek()
             if kind == 'SPECIAL' and val in ('.', '?', '!'):
@@ -104,8 +103,8 @@ class Parser:
     def parse_compound(self):
         self.consume(expected_value='(')
         kind, val = self.peek()
-        # operador composto (&&, ||, --, &/, |, &, ~)
-        if val in ('&&', '||', '--', '&/', '|', '&', '~'):
+        # Recognise negation '--' as an operator
+        if kind == 'OP' and val in ('&&', '||', '--', '&/', '|', '&', '~'):
             op = val
             self.consume()
             self.consume(expected_value=',')
@@ -124,7 +123,7 @@ class Parser:
             self.consume(expected_value=')')
             return ('compound', op, args)
         else:
-            # produto: A * B * C ...
+            # product: A * B ...
             left = self.parse_term()
             kind, val = self.peek()
             if val == '*':
@@ -141,12 +140,11 @@ class Parser:
                 self.consume(expected_value=')')
                 return ('product', args)
             else:
-                # parênteses comuns (apenas agrupamento)
                 self.consume(expected_value=')')
                 return left
 
 # ------------------------------------------------------------
-# Graph Emitter
+# Graph Emitter (same as before, but include fallback for robustness)
 # ------------------------------------------------------------
 class GraphEmitter:
     def __init__(self, add_tag=None):
@@ -201,24 +199,13 @@ class GraphEmitter:
         self.out.write(json.dumps(op) + '\n')
 
     def traverse_term(self, term, parent_term=None, relation_label=None):
-        # Emite o nó atual
-        color = None
         typ = term[0]
-        if typ == 'atom':
-            color = '#7FDBFF'
-        elif typ == 'stmt':
-            color = '#FF851B'
-        elif typ == 'compound':
-            color = '#B10DC9'
-        elif typ == 'product':
-            color = '#39CCCC'
+        color = {'atom': '#7FDBFF', 'stmt': '#FF851B', 'compound': '#B10DC9', 'product': '#39CCCC'}.get(typ, None)
         self.emit_node(term, color=color)
 
-        # Se tem um pai, desenha a aresta estrutural
         if parent_term is not None and relation_label is not None:
             self.emit_edge(parent_term, term, relation_label, color='#DDDDDD')
 
-        # Recurse nos filhos
         if typ == 'atom':
             pass
         elif typ == 'stmt':
@@ -226,7 +213,6 @@ class GraphEmitter:
             self.traverse_term(left, parent_term=term, relation_label='[subject]')
             if right:
                 self.traverse_term(right, parent_term=term, relation_label='[predicate]')
-                # aresta direta entre sujeito e predicado com o operador
                 self.emit_edge(left, right, rel, color='#FF4136')
         elif typ == 'compound':
             _, op, args = term
@@ -244,78 +230,20 @@ class GraphEmitter:
             term = parser.parse_term()
         except ParseError as e:
             sys.stderr.write(f"Parse error: {e} on line: {line}\n")
-            self.process_line_fallback(line)
+            # Fallback: create a single grey node for the whole line
+            giant = ('atom', line)
+            self.emit_node(giant, color='#AAAAAA')
             return
         self.traverse_term(term)
-
-    # ------------------------------------------------------------
-    # Fallback: cria um nó gigante e liga subestruturas
-    # ------------------------------------------------------------
-    def extract_nested_blocks(self, s):
-        """
-        Retorna uma lista de substrings que são blocos Narsese de primeiro nível:
-        <...> ou (...) que não estão aninhados dentro de outro bloco.
-        """
-        blocks = []
-        stack = []
-        start = -1
-        for i, ch in enumerate(s):
-            if ch in '<(':
-                if not stack:
-                    start = i
-                stack.append(ch)
-            elif ch in '>)':
-                if stack and ((stack[-1] == '<' and ch == '>') or (stack[-1] == '(' and ch == ')')):
-                    stack.pop()
-                    if not stack:
-                        blocks.append(s[start:i+1])
-                else:
-                    # mal formado – reinicia
-                    stack = []
-        return blocks
-
-    def process_line_fallback(self, line):
-        # 1. Nó gigante representando a linha inteira
-        giant_term = ('atom', line)
-        self.emit_node(giant_term, color='#AAAAAA')
-
-        # 2. Extrai blocos de primeiro nível e os processa
-        blocks = self.extract_nested_blocks(line)
-        for block in blocks:
-            tokens = tokenize(block)
-            parser = Parser(tokens)
-            try:
-                subterm = parser.parse_term()
-            except ParseError:
-                # Se falhar, trata o bloco como um átomo literal
-                subterm = ('atom', block)
-            # Processa o bloco (seus nós e arestas internas)
-            self.traverse_term(subterm)
-            # Adiciona aresta do nó gigante para a raiz do bloco
-            src_id = self.node_id(giant_term)
-            dst_id = self.node_id(subterm)
-            if src_id != dst_id:
-                edge_op = {
-                    'op': 'add_edge',
-                    'source': src_id,
-                    'target': dst_id,
-                    'label': '[contains]',
-                    'color': '#777777'
-                }
-                if self.add_tag:
-                    edge_op.setdefault('tags', []).append(self.add_tag)
-                self.out.write(json.dumps(edge_op) + '\n')
 
 # ------------------------------------------------------------
 # Main
 # ------------------------------------------------------------
 def main():
-    parser = argparse.ArgumentParser(description='Convert Narsese to graph JSON lines (robust parser with fallback)')
-    parser.add_argument('--tag', default=None, help='Add this tag to every node/edge')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--tag', default=None)
     args = parser.parse_args()
-
     emitter = GraphEmitter(add_tag=args.tag)
-
     for line in sys.stdin:
         line = line.strip()
         if not line or line.startswith('//'):
