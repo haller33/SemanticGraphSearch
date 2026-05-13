@@ -9,6 +9,8 @@ JOBS_PER_WORD=3                 # (fuzzy, prefix, def) – used to track total j
 
 USE_FUZZY_C_LIBRARY=1
 
+USE_MORPHOLOGY=1
+
 TMP_PID_FILE="/tmp/semantic_pids.$$"  # unique per script run
 
 # Plain NAL mode flag (default: false)
@@ -33,6 +35,20 @@ clean_word() {
     echo "$1" | sed 's/^[^a-zA-Z0-9]*//; s/[^a-zA-Z0-9]*$//'
 }
 
+run_morphology() {
+
+    local word=$1
+
+    # MORPHLIB=morpheus-perseids/stemlib morpheus-perseids/bin/morpheus -L 'Sperne repugnando tibi tu contrarius esse: Conveniet nulli, qui secum dissidet ipse.' >> morphology_extended.xml
+    # cat morphology.xml |
+    #    uv run python morphology_to_nal.py |
+    #    ../OpenNARS-for-Applications/NAR shell |
+    #    sh extract_derived.sh |
+    #    python3 narsese2json.v2.py --tag derived |
+    #    uv run --with requests python send2graph.py --color "#ff0000"
+    
+}
+
 # Launch a single search – in plain mode it runs synchronously and prints NAL.
 run_search() {
     local limit="$1"
@@ -49,11 +65,11 @@ run_search() {
     else
         # Graph mode: background pipeline
         if [ "$USE_FUZZY_C_LIBRARY" -eq 1 ]; then
-            nohup sh -c "lua ./semantic-exp-nal.lua --fuzzy-c --limit ${limit} --to-narsese --${mode} \"${word}\" | python3 narsese2json.py | uv run --with requests python send2graph.py" > "/dev/null" 2>&1 &
+            nohup sh -c "lua ./semantic-exp-nal.lua --fuzzy-c --limit ${limit} --to-narsese --${mode} \"${word}\" | python3 narsese2json.v2.py --tag input | uv run --with requests python send2graph.py" > "/dev/null" 2>&1 &
             local pid=$!
             echo "$pid" >> "$TMP_PID_FILE"
         else
-            nohup sh -c "lua ./semantic-exp-nal.lua --limit ${limit} --to-narsese --${mode} \"${word}\" | python3 narsese2json.py | uv run --with requests python send2graph.py" > "/dev/null" 2>&1 &
+            nohup sh -c "lua ./semantic-exp-nal.lua --limit ${limit} --to-narsese --${mode} \"${word}\" | python3 narsese2json.v2.py --tag input | uv run --with requests python send2graph.py" > "/dev/null" 2>&1 &
             local pid=$!
             echo "$pid" >> "$TMP_PID_FILE"
         fi
@@ -123,6 +139,10 @@ for raw_word in $phrase; do
         run_search "$LIMIT_FUZZY"  "fuzzy"  "$cleaned"
         run_search "$LIMIT_PREFIX" "prefix" "$cleaned"
         run_search "$LIMIT_DEF"    "def"    "$cleaned"
+    fi
+
+    if [ "{USE_MORPHOLOGY}" -eq 1 ]; then
+        run_morphology "$cleaned"
     fi
 done
 
