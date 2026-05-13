@@ -7,7 +7,7 @@ LIMIT_DEF=3
 MAX_CONCURRENT_WORDS=1          # process up to 1 word simultaneously (adjustable)
 JOBS_PER_WORD=3                 # (fuzzy, prefix, def) – used to track total jobs
 
-USE_FUZZY_C_LIBRARY=true
+USE_FUZZY_C_LIBRARY=1
 
 TMP_PID_FILE="/tmp/semantic_pids.$$"  # unique per script run
 
@@ -17,6 +17,14 @@ PLAIN_NAL=0
 # Parse flags
 while [ "$1" = "--plain-nal" ]; do
     PLAIN_NAL=1
+    shift
+done
+
+while [ "$1" = "--limit" ]; do
+    
+    LIMIT_FUZZY="$2"
+    LIMIT_PREFIX="$2"
+    LIMIT_DEF="$2"
     shift
 done
 
@@ -33,14 +41,14 @@ run_search() {
 
     if [ "$PLAIN_NAL" -eq 1 ]; then
         # Plain NAL mode: run in foreground, output to stdout
-        if [[ USE_FUZZY_C_LIBRARY ]]; then
+        if [ "$USE_FUZZY_C_LIBRARY" -eq 1 ]; then
             lua ./semantic-exp-nal.lua --fuzzy-c --limit "${limit}" --to-narsese "--${mode}" "${word}"
         else 
             lua ./semantic-exp-nal.lua --limit "${limit}" --to-narsese "--${mode}" "${word}"
         fi 
     else
         # Graph mode: background pipeline
-        if [[ USE_FUZZY_C_LIBRARY ]]; then
+        if [ "$USE_FUZZY_C_LIBRARY" -eq 1 ]; then
             nohup sh -c "lua ./semantic-exp-nal.lua --fuzzy-c --limit ${limit} --to-narsese --${mode} \"${word}\" | python3 narsese2json.py | uv run --with requests python send2graph.py" > "/dev/null" 2>&1 &
             local pid=$!
             echo "$pid" >> "$TMP_PID_FILE"
