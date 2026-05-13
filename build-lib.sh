@@ -6,7 +6,7 @@ mkdir -p bin lib
 # Try to find Lua development files using pkg-config
 if command -v pkg-config >/dev/null 2>&1; then
     # Try common Lua versions
-    for luaver in lua5.2 lua-5.2 lua5.3 lua-5.3 lua5.4 lua-5.4 lua; do
+    for luaver in lua5.1 lua5.2 lua-5.2 lua5.3 lua-5.3 lua5.4 lua-5.4 lua; do
         if pkg-config --exists "$luaver" 2>/dev/null; then
             CFLAGS=$(pkg-config --cflags "$luaver")
             LIBS=$(pkg-config --libs "$luaver")
@@ -15,6 +15,9 @@ if command -v pkg-config >/dev/null 2>&1; then
         fi
     done
 else
+    if [ -f /data/data/com.termux/files/usr/include/lua5.1/lua.h ]; then
+        CFLAGS="-I/data/data/com.termux/files/usr/include/lua5.1"
+        LIBS="-llua5.1"
     # Fallback to common include/library paths
     if [ -f /usr/include/lua5.2/lua.h ]; then
         CFLAGS="-I/usr/include/lua5.2"
