@@ -13,13 +13,16 @@
 #     sh extract_derived.sh | python3 narsese2json.v2.py --tag derived |
 #     uv run --with requests python send2graph.py --color "#ff0000" &
 
+# lua filter_derived.lua --min-confidence 0.9 --min-priority 0.7 | sh extract_derived.sh
+# | python3 narsese2json.v3.py --tag derived | uv run --with requests python send2graph.py --color "#ff0000"
+
 # services.sh - start/stop background NARS pipeline services
 
 # --- Configuration ---
 INPUT_FILE="input.nal"
 DERIVED_FILE="derived.nal"
 NAR_BINARY="../OpenNARS-for-Applications/NAR"   # adjust path if needed
-FILTER_SCRIPT="lua ./filter_derived.lua"
+FILTER_SCRIPT="./filter_derived.lua"
 EXTRACT_SCRIPT="./extract_derived.sh"
 PID_DIR="./tmp"
 PID_FILE="$PID_DIR/nars_services.pids"
@@ -28,6 +31,10 @@ PID_FILE="$PID_DIR/nars_services.pids"
 # Helper functions
 # ----------------------------------------------------------------------
 start_services() {
+    if [[ -f "$PID_FILE" ]]; then
+        echo "PID file aready exists. services are running!"
+        exit 1
+    fi
     echo "Starting NARS background services..."
 
     mkdir -p "$PID_DIR"
@@ -36,20 +43,22 @@ start_services() {
     touch "$INPUT_FILE" "$DERIVED_FILE"
 
     # 1. Send input.nal to graph (tag 'input')
-    tail -f "$INPUT_FILE" | python3 narsese2json.v2.py --tag input | uv run --with requests python send2graph.py &
+    stdbuf -oL tail -f "$INPUT_FILE" | stdbuf -oL ./bin/narsese2json --tag input |
+        stdbuf -oL ./bin/send2graph &
     PID1=$!
     echo "Service 1 (input → graph) PID: $PID1"
 
     # 2. Feed input.nal to NARS Shell, output appended to derived.nal
-    tail -f "$INPUT_FILE" | "$NAR_BINARY" shell >> "$DERIVED_FILE" &
+    stdbuf -oL tail -f "$INPUT_FILE" | stdbuf -oL "$NAR_BINARY" shell >> "$DERIVED_FILE" &
     PID2=$!
     echo "Service 2 (input → NAR → derived.nal) PID: $PID2"
 
     # 3. Filter derived.nal, extract derived statements, send to graph (tag 'derived', red color)
-    tail -f "$DERIVED_FILE" |
-        # "$FILTER_SCRIPT" --min-confidence 0.02 --min-priority 0.02 |
-        "$EXTRACT_SCRIPT" | python3 narsese2json.v2.py --tag derived |
-        uv run --with requests python send2graph.py --color "#ff0000" &
+    stdbuf -oL tail -f "$DERIVED_FILE" |
+        stdbuf -oL ./bin/filter_derived --min-confidence 0.9 --min-priority 0.7 |
+        stdbuf -oL "$EXTRACT_SCRIPT" |
+        stdbuf -oL ./bin/narsese2json --tag derived |
+        stdbuf -oL ./bin/send2graph --color "#ff0000" &
     PID3=$!
     echo "Service 3 (derived → filter → extract → graph) PID: $PID3"
 
@@ -101,6 +110,14 @@ status_services() {
     done < "$PID_FILE"
 }
 
+load_ontology() {
+
+    echo "load basic formal ontology - BFO"
+    cat ontology.nal | grep -v '^//' | grep '.' --color=none >> input.nal
+    echo "load a extension of BFO for grammar and language"
+    cat ontology-extended.nal | grep -v '^//' | grep '.' --color=none >> input.nal
+}
+
 # ----------------------------------------------------------------------
 # Main command parsing
 # ----------------------------------------------------------------------
@@ -119,8 +136,11 @@ case "$1" in
     status)
         status_services
         ;;
+    ontology)
+        load_ontology
+        ;;
     *)
-        echo "Usage: $0 {start|stop|restart|status}"
+        echo "Usage: $0 {start|stop|restart|status|ontology}"
         exit 1
         ;;
 esac

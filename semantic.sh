@@ -65,11 +65,11 @@ run_search() {
     else
         # Graph mode: background pipeline
         if [ "$USE_FUZZY_C_LIBRARY" -eq 1 ]; then
-            nohup sh -c "lua ./semantic-exp-nal.lua --fuzzy-c --limit ${limit} --to-narsese --${mode} \"${word}\" | python3 narsese2json.v3.py --tag input | uv run --with requests python send2graph.py" > "/dev/null" 2>&1 &
+            nohup sh -c "lua ./semantic-exp-nal.lua --fuzzy-c --limit ${limit} --to-narsese --${mode} \"${word}\" | ./bin/narsese2json --tag input | ./bin/send2graph" > "/dev/null" 2>&1 &
             local pid=$!
             echo "$pid" >> "$TMP_PID_FILE"
         else
-            nohup sh -c "lua ./semantic-exp-nal.lua --limit ${limit} --to-narsese --${mode} \"${word}\" | python3 narsese2json.v3.py --tag input | uv run --with requests python send2graph.py" > "/dev/null" 2>&1 &
+            nohup sh -c "lua ./semantic-exp-nal.lua --limit ${limit} --to-narsese --${mode} \"${word}\" | ./bin/narsese2json --tag input | ./bin/send2graph" > "/dev/null" 2>&1 &
             local pid=$!
             echo "$pid" >> "$TMP_PID_FILE"
         fi

@@ -8,6 +8,7 @@ let
     libmicrohttpd
     cjson
     uthash
+    curl            # <-- added for send2graph.c compilation
   ];
   libPath = pkgs.lib.makeLibraryPath runtimeDeps;
 
@@ -26,6 +27,8 @@ pkgs.mkShell {
     pandoc
     python3
     luaWithSqlite
+    curl            # <-- added for send2graph.c compilation
+    pkg-config        # helpful for finding cflags/ldflags
   ];
 
   # Libraries for compiling/linking (C/C++)

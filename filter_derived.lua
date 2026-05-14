@@ -1,14 +1,14 @@
 #!/usr/bin/env lua
-
--- filter_derived.lua - filter Derived lines by priority, frequency, and confidence
+-- filter_derived.lua - filter Derived lines by priority, frequency, confidence
 -- Usage: ./filter_derived.lua [--min-priority P] [--min-frequency F] [--min-confidence C]
--- Defaults: all thresholds = 0 (no filtering)
+
+io.stdout:setvbuf('line')   -- force line buffering in pipes
 
 local min_priority = 0
 local min_frequency = 0
 local min_confidence = 0
 
--- Parse command line arguments
+-- Parse arguments
 local args = {...}
 local i = 1
 while i <= #args do
@@ -28,20 +28,27 @@ while i <= #args do
     end
 end
 
--- Helper: extract number using a pattern that matches digits, dot, e/E, plus, minus
--- The pattern works with Lua 5.1; hyphen is placed last to avoid range issues.
-local function extract_number(line, pattern)
+-- Robust number extraction: handles scientific notation, negative numbers, decimals
+local function extract_number(line, key)
+    local pattern = key .. "=([%d%.eE+%-]+)"
     local num_str = line:match(pattern)
     if num_str then
-        return tonumber(num_str) or 0
+        local num = tonumber(num_str)
+        if num then return num end
     end
     return 0
 end
 
--- Process stdin line by line
-for line in io.lines() do
+-- Process stdin line by line, never exit (even on error)
+while true do
+    local line = io.read()
+    if not line then
+        break   -- EOF (should not happen with tail -f, but handle gracefully)
+    end
+
+    -- Only filter lines that start with "Derived:"
     if line:find("^Derived:") then
-        local pri = extract_number(line, "Priority=([%d%.eE+%-]+)")
+        local pri = extract_number(line, "Priority")
         local freq_str, conf_str = line:match("Truth: frequency=([%d%.eE+%-]+), confidence=([%d%.eE+%-]+)")
         local freq = freq_str and tonumber(freq_str) or 0
         local conf = conf_str and tonumber(conf_str) or 0
@@ -50,6 +57,9 @@ for line in io.lines() do
             print(line)
         end
     else
+        -- Pass through non-Derived lines unchanged (e.g., Input:, Selected:)
         print(line)
     end
+    -- Flush explicitly (optional, setvbuf line already does it)
+    io.stdout:flush()
 end

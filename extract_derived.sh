@@ -1,10 +1,10 @@
 #!/usr/bin/env sh
 
-grep -v -e 'Input: ' -e 'Selected: ' | 
-    grep '^Derived:' |
-    sed 's/^Derived: //' |
-    sed 's/\. Priority=.*/>./' |
-    grep -v '^$'
+stdbuf -oL grep -v -e 'Input: ' -e 'Selected: ' | 
+    stdbuf -oL grep '^Derived:' |
+    stdbuf -oL sed 's/^Derived: //' |
+    stdbuf -oL sed 's/\. Priority=.*/>./' |
+    stdbuf -oL grep -v '^$'
 
 # sed 's/>. Priority=.*/>./g' |
 #    head -n -18 |
