@@ -27,6 +27,8 @@ EXTRACT_SCRIPT="./extract_derived.sh"
 PID_DIR="./tmp"
 PID_FILE="$PID_DIR/nars_services.pids"
 
+TEXT_BASE_ONLY=0
+
 # ----------------------------------------------------------------------
 # Helper functions
 # ----------------------------------------------------------------------
@@ -42,26 +44,30 @@ start_services() {
     # Ensure input and derived files exist
     touch "$INPUT_FILE" "$DERIVED_FILE"
 
-    # 1. Send input.nal to graph (tag 'input')
-    stdbuf -oL tail -f "$INPUT_FILE" | stdbuf -oL ./bin/narsese2json --tag input |
-        stdbuf -oL ./bin/send2graph &
-    PID1=$!
-    echo "Service 1 (input → graph) PID: $PID1"
-
+    if [ "$TEXT_BASE_ONLY" -eq 0 ]; then
+        # 1. Send input.nal to graph (tag 'input')
+        stdbuf -oL tail -f "$INPUT_FILE" | stdbuf -oL ./bin/narsese2json --tag input |
+            stdbuf -oL ./bin/send2graph &
+        PID1=$!
+        echo "Service 1 (input → graph) PID: $PID1"
+    fi
+    
     # 2. Feed input.nal to NARS Shell, output appended to derived.nal
     stdbuf -oL tail -f "$INPUT_FILE" | stdbuf -oL "$NAR_BINARY" shell >> "$DERIVED_FILE" &
     PID2=$!
     echo "Service 2 (input → NAR → derived.nal) PID: $PID2"
 
-    # 3. Filter derived.nal, extract derived statements, send to graph (tag 'derived', red color)
-    stdbuf -oL tail -f "$DERIVED_FILE" |
-        stdbuf -oL ./bin/filter_derived --min-confidence 0.9 --min-priority 0.7 |
-        stdbuf -oL "$EXTRACT_SCRIPT" |
-        stdbuf -oL ./bin/narsese2json --tag derived |
-        stdbuf -oL ./bin/send2graph --color "#ff0000" &
-    PID3=$!
-    echo "Service 3 (derived → filter → extract → graph) PID: $PID3"
-
+    if [ "$TEXT_BASE_ONLY" -eq 0 ]; then
+        # 3. Filter derived.nal, extract derived statements, send to graph (tag 'derived', red color)
+        stdbuf -oL tail -f "$DERIVED_FILE" |
+            stdbuf -oL ./bin/filter_derived --min-confidence 0.9 --min-priority 0.7 |
+            stdbuf -oL "$EXTRACT_SCRIPT" |
+            stdbuf -oL ./bin/narsese2json --tag derived |
+            stdbuf -oL ./bin/send2graph --color "#ff0000" &
+        PID3=$!
+        echo "Service 3 (derived → filter → extract → graph) PID: $PID3"
+    fi
+    
     # Save PIDs with service names
     cat > "$PID_FILE" <<EOF
 input_graph:$PID1
@@ -118,11 +124,20 @@ load_ontology() {
     cat ontology-extended.nal | grep -v '^//' | grep '.' --color=none >> input.nal
 }
 
+clean_files() {
+    echo "clean files: input.nal derived.nal"
+    rm -f input.nal derived.nal
+}
+
 # ----------------------------------------------------------------------
 # Main command parsing
 # ----------------------------------------------------------------------
 case "$1" in
     start)
+        start_services
+        ;;
+    text)
+        TEXT_BASE_ONLY=1
         start_services
         ;;
     stop)
@@ -139,8 +154,11 @@ case "$1" in
     ontology)
         load_ontology
         ;;
+    clean)
+        clean_files
+        ;;
     *)
-        echo "Usage: $0 {start|stop|restart|status|ontology}"
+        echo "Usage: $0 {start|text|stop|restart|status|ontology}"
         exit 1
         ;;
 esac
