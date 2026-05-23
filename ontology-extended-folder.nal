@@ -1,0 +1,151 @@
+// --- EXTENSION FOR FOLDERS AND OPERATING SYSTEMS ---
+
+// Information objects as generically dependent continuants
+<digital_object --> generically_dependent_continuan>.
+<folder --> digital_object>.
+<file --> digital_object>.
+
+// Operating system as a software system (also a generically dependent continuant)
+<operating_system --> digital_object>.
+
+// File system structure (a role or disposition of a storage device)
+<file_system --> disposition>.
+
+// Relations
+// Containment: a folder contains files or subfolders
+<(folder * file) --> contains>.
+<(folder * folder) --> contains>.
+
+// Path relation (tree structure)
+<(folder * folder) --> subfolder_of>.
+
+// Ownership / management: an operating system manages the file system and folders
+<(operating_system * file_system) --> manages>.
+<(operating_system * folder) --> can_access>.
+
+// Execution: a process (occurrent) uses an operating system
+<(process * operating_system) --> runs_on>.
+
+// Example: a specific folder 'Documents' is a folder
+<{Documents} --> folder>.
+
+// Example: 'Windows' operating system
+<{Linux} --> operating_system>.
+<{Windows} --> operating_system>.
+
+// Example: a process 'save_file' is realized on the OS
+<(save_file * {Windows}) --> runs_on>.
+<(save_file * {Linux}) --> runs_on>.
+
+// Example: a folder contains a file
+// <({Documents} * {resume.pdf}) --> contains>.
+
+// Example: the file system is part of the storage device (material entity)
+// <(file_system * storage_device) --> inheres_in>.
+
+// --- EXTENSION FOR MULTIMEDIA ONTOLOGIES (FILESYSTEM AND MEDIA TYPES) ---
+// Based on BFO upper ontology and previous file-system extension.
+// This extension adds concepts for multimedia files, formats, codecs, metadata, and media-specific processes.
+
+// --- MULTIMEDIA TYPES AS GENERICALLY DEPENDENT CONTINUANTS ---
+<multimedia_object --> digital_object>.
+<audio_object --> multimedia_object>.
+<video_object --> multimedia_object>.
+<image_object --> multimedia_object>.
+<document_object --> digital_object>.
+
+// --- FILE FORMATS (as generically dependent continuants) ---
+<file_format --> generically_dependent_continuan>.
+<audio_format --> file_format>.
+<video_format --> file_format>.
+<image_format --> file_format>.
+<document_format --> file_format>.
+
+// Specific formats
+<mp3 --> audio_format>.
+<wav --> audio_format>.
+<mp4 --> video_format>.
+<avi --> video_format>.
+<jpeg --> image_format>.
+<png --> image_format>.
+<pdf --> document_format>.
+
+// --- CODECS (as realizable entities / dispositions) ---
+<codec --> disposition>.
+<audio_codec --> codec>.
+<video_codec --> codec>.
+
+// --- METADATA (as specifically dependent continuants) ---
+<metadata --> specifically_dependent_continua>.
+<technical_metadata --> metadata>.
+<descriptive_metadata --> metadata>.
+<duration --> technical_metadata>.
+<resolution --> technical_metadata>.
+<bitrate --> technical_metadata>.
+<sample_rate --> technical_metadata>.
+<channels --> technical_metadata>.
+<frame_rate --> technical_metadata>.
+<aspect_ratio --> technical_metadata>.
+<color_space --> technical_metadata>.
+<title --> descriptive_metadata>.
+<artist --> descriptive_metadata>.
+<album --> descriptive_metadata>.
+<genre --> descriptive_metadata>.
+<creation_date --> descriptive_metadata>.
+<modification_date --> descriptive_metadata>.
+
+// --- RELATIONS FOR MULTIMEDIA OBJECTS ---
+// A multimedia object has a file format
+<(multimedia_object * file_format) --> has_format>.
+// A multimedia object has a codec (if applicable)
+<(audio_object * audio_codec) --> uses_codec>.
+<(video_object * video_codec) --> uses_codec>.
+// Metadata inherence
+<(metadata * multimedia_object) --> inheres_in>.
+// A multimedia object contains metadata values (as qualities)
+< ((metadata) * (e.g., "1920x1080")) --> has_value >. // Use Narsese product for specific value
+
+// --- PROCESSES RELATED TO MULTIMEDIA (occurents) ---
+<playback --> process>.
+<editing --> process>.
+<transcoding --> process>.
+<recording --> process>.
+<streaming --> process>.
+
+// --- PARTICIPATION RELATIONS ---
+// A process involves a multimedia object
+<(playback * multimedia_object) --> participates_in>.
+<(editing * multimedia_object) --> participates_in>.
+<(transcoding * multimedia_object) --> participates_in>.
+<(recording * multimedia_object) --> participates_in>.
+<(streaming * multimedia_object) --> participates_in>.
+
+// --- EXAMPLE INSTANCES ---
+// <{song.mp3} --> audio_object>.
+// <{song.mp3} --> (has_format * mp3)>.
+// <{video.mp4} --> video_object>.
+// <{video.mp4} --> (has_format * mp4)>.
+// <{photo.jpg} --> image_object>.
+// <{photo.jpg} --> (has_format * jpeg)>.
+
+// --- METADATA EXAMPLES ---
+// <duration_metadata --> duration>.
+// <(duration_metadata * {song.mp3}) --> inheres_in>.
+// < ((duration_metadata) * 243) --> has_value>.   // 243 seconds
+
+// <resolution_metadata --> resolution>.
+// <(resolution_metadata * {video.mp4}) --> inheres_in>.
+// < ((resolution_metadata) * (1920 * 1080)) --> has_value>.
+
+// --- INFERENCE RULES (optional) ---
+// If a file has format X, it inherits properties of that format
+< <$1 --> (has_format * $2)> ==> <$1 --> ($2 * type)>>.  // Placeholder, not fully formal
+// If a process participates in a multimedia object, it uses its format
+< (&&, < $1 --> playback >, <($1 * $2) --> participates_in>, <$2 --> (has_format * $3)>) ==> <($1 * $3) --> uses_format> >.
+
+// --- EXTENSION FOR FILESYSTEM HIERARCHY ---
+// Add path depth and root concepts
+<root_folder --> folder>.
+<((folder * folder) --> subfolder_of) ==> <(folder * root_folder) --> under_root>>.
+
+// --- END OF MULTIMEDIA ONTOLOGIES EXTENSION ---

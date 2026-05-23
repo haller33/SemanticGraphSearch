@@ -3,8 +3,15 @@
 stdbuf -oL grep -v -e 'Input: ' -e 'Selected: ' | 
     stdbuf -oL grep '^Derived:' |
     stdbuf -oL sed 's/^Derived: //' |
-    stdbuf -oL sed 's/\. Priority=.*/>./' |
+    stdbuf -oL sed 's/ Priority=.*//' |
     stdbuf -oL grep -v '^$'
+
+
+# stdbuf -oL grep -v -e 'Input: ' -e 'Selected: ' | 
+#     stdbuf -oL grep '^Derived:' |
+#     stdbuf -oL sed 's/^Derived: //' |
+#     stdbuf -oL sed 's/\. Priority=.*/>./' |
+#     stdbuf -oL grep -v '^$'
 
 # sed 's/>. Priority=.*/>./g' |
 #    head -n -18 |
