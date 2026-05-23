@@ -1,66 +1,210 @@
 // --- EXTENSÃO LINGUÍSTICA PARA BFO (NAL) ---
+// CORRIGIDA CONFORME BFO 2.0
+// Remove inferências inválidas que violam a distinção entre categorias BFO.
+// Relações como denota, descreve, modifica, mapeia_para são declaradas como primitivas
+// e devem ser definidas futuramente com axiomas all-some (não implementados aqui).
 
-// Definição da Categoria de Linguagem
+// ============================================================================
+// 1. CATEGORIAS LINGUÍSTICAS COMO DEPENDENTES GENÉRICOS
+// ============================================================================
+
+// Linguagem (tipo) é um dependente genérico – correto.
 < linguagem --> generically_dependent_continuant >.
+
+// Entidade linguística (substantivo, verbo, etc.) é subclasse de linguagem.
 < entidade_linguistica --> linguagem >.
 
-// Classes Gramaticais (Part-of-Speech) como subcategorias de Entidade Linguística
+// Classes gramaticais (part-of-speech) são tipos de entidades linguísticas.
 < substantivo --> entidade_linguistica >.
 < verbo --> entidade_linguistica >.
 < adjetivo --> entidade_linguistica >.
 < adverbio --> entidade_linguistica >.
 < preposicao --> entidade_linguistica >.
 
-// --- O "GLUE" (COLA) ONTOLÓGICO-GRAMATICAL ---
-// Relaciona classes gramaticais às categorias fundamentais da BFO
+// ============================================================================
+// 2. RELAÇÕES ENTRE CLASSES GRAMATICAIS E CATEGORIAS BFO (SEM INFERÊNCIAS)
+// ============================================================================
+// Estas relações indicam o que os termos dessas classes tipicamente denotam.
+// Não reclassificam as classes gramaticais como entidades BFO fundamentais.
 
-// Substantivos geralmente denotam Continuantes (Objetos, Lugares)
+// Substantivos denotam continuantes (objetos, qualidades, etc.)
 < (substantivo * continuant) --> denota >.
 
-// Verbos geralmente denotam Ocorrentes (Processos, Eventos)
+// Verbos denotam ocorrentes (processos, eventos)
 < (verbo * occurrent) --> denota >.
 
-// Adjetivos geralmente denotam Qualidades ou Papéis (Dependentes)
+// Adjetivos descrevem dependentes específicos (qualidades, papéis)
 < (adjetivo * specifically_dependent_continuant) --> descreve >.
 
-// Advérbios qualificam Processos (Ocorrentes)
+// Advérbios modificam ocorrentes (processos)
 < (adverbio * occurrent) --> modifica >.
 
-// Preposições denotam Relações Espaciais ou Temporais
+// Preposições mapeiam para regiões espaciais ou temporais
 < (preposicao * spatial_region) --> mapeia_para >.
 < (preposicao * temporal_region) --> mapeia_para >.
 
-// --- REGRAS DE INFERÊNCIA PARA O MOTOR (Lógica de Segunda Ordem) ---
+// ============================================================================
+// 3. BASE: TIPO PALAVRA E INSTÂNCIA MATERIAL
+// ============================================================================
 
-// Se um termo é um substantivo, o motor de inferência assume que ele busca um Continuante
-< < $1 --> substantivo > ==> < $1 --> continuant > >.
+// Tipo palavra (genericamente dependente) – já implícito em entidade_linguistica.
+// Declarado explicitamente para clareza.
+< palavra --> entidade_linguistica >.
 
-// Se um termo é um verbo, o motor de inferência assume que ele descreve um Processo
-< < $1 --> verbo > ==> < $1 --> process > >.
+// Instância concreta da palavra (token material)
+< instancia_palavra --> material_entity >.
 
-// Regra de Ligação: Atributo Gramatical -> Propriedade Ontológica
-// Se a palavra $1 descreve a entidade $2, então $2 possui a qualidade $1
-< (&&, < $1 --> adjetivo >, < ($1 * $2) --> descreve >) ==> < $2 --> [ $1 ] > >.
+// Relação de concretização: o token material concretiza o tipo palavra
+< (instancia_palavra * palavra) --> concretiza >.
 
-// --- EXEMPLOS DE TRADUÇÃO E MAPEAMENTO ---
+// ============================================================================
+// 4. ATRIBUTOS GRAMATICAIS COMO DEPENDENTES ESPECÍFICOS (QUALIDADES)
+// ============================================================================
 
-// "Gato" é um substantivo que denota um objeto (Continuant)
-// < {gato} --> substantivo >.
-// < ({gato} * continuant) --> denota >.
+// Atributos gramaticais são qualidades (specifically_dependent_continuant)
+< atributo_gramatical --> specifically_dependent_continuant >.
 
-// "Correr" é um verbo que denota um processo (Occurrent)
-// < {correr} --> verbo >.
-// < ({correr} * process) --> denota >.
+// Categorias de atributos (universais)
+< caso --> atributo_gramatical >.
+< numero --> atributo_gramatical >.
+< genero --> atributo_gramatical >.
+< modo --> atributo_gramatical >.
+< tempo --> atributo_gramatical >.
+< voz --> atributo_gramatical >.
+< pessoa --> atributo_gramatical >.
+< declinacao --> atributo_gramatical >.
+< tipo_de_tema --> atributo_gramatical >.
+< morfologia --> atributo_gramatical >.
+< tipo_derivacao --> atributo_gramatical >.
+< classe_gramatical --> atributo_gramatical >.
+< lema --> atributo_gramatical >.
 
-// "Rápido" é um advérbio que modifica o processo
-// < {rapido} --> adverbio >.
-// < ({rapido} * {correr}) --> modifica >.
+// ============================================================================
+// 5. VALORES DOS ATRIBUTOS (SUBCATEGORIAS)
+// ============================================================================
 
-// "Sobre" (preposição) mapeia uma relação de localização
-// < {sobre} --> preposicao >.
-// < ({sobre} * spatial_region) --> mapeia_para >.
+// --- Caso ---
+< nominativo --> caso >.
+< genitivo --> caso >.
+< dativo --> caso >.
+< acusativo --> caso >.
+< ablativo --> caso >.
+< vocativo --> caso >.
+< locativo --> caso >.
 
-// Exemplo de inferência composta: "O gato rápido corre sobre o tapete"
-// O sistema "cola" as classes: Gato(Cont) + Rápido(Qual) + Correr(Occ) + Sobre(Rel)
-// < (&&, <{gato} --> continuant>, <({gato} * {correr}) --> participates_in>) >.
-// < ({correr} * {tempo_agora}) --> occupies >.
+// --- Número ---
+< singular --> numero >.
+< plural --> numero >.
+
+// --- Gênero ---
+< masculino --> genero >.
+< feminino --> genero >.
+< neutro --> genero >.
+
+// --- Modo ---
+< indicativo --> modo >.
+< subjuntivo --> modo >.
+< imperativo --> modo >.
+< infinitivo --> modo >.
+< particípio --> modo >.
+< gerúndio --> modo >.
+< supino --> modo >.
+< gerundivo --> modo >.
+
+// --- Tempo verbal ---
+< presente --> tempo >.
+< imperfeito --> tempo >.
+< futuro --> tempo >.
+< perfeito --> tempo >.
+< mais_que_perfeito --> tempo >.
+< futuro_perfeito --> tempo >.
+
+// --- Voz ---
+< ativo --> voz >.
+< passivo --> voz >.
+
+// --- Pessoa ---
+< primeira --> pessoa >.
+< segunda --> pessoa >.
+< terceira --> pessoa >.
+
+// --- Declinação ---
+< primeira_declinacao --> declinacao >.
+< segunda_declinacao --> declinacao >.
+< terceira_declinacao --> declinacao >.
+< quarta_declinacao --> declinacao >.
+< quinta_declinacao --> declinacao >.
+
+// --- Tipo de Tema (stemtype) ---
+< participio_perfeito_4 --> tipo_de_tema >.
+< conjuncao_tematica --> tipo_de_tema >.
+< advérbio --> tipo_de_tema >.
+< conjugacao_1 --> tipo_de_tema >.
+< conjugacao_3 --> tipo_de_tema >.
+< adjetivo_irregular_3 --> tipo_de_tema >.
+< pronome_3 --> tipo_de_tema >.
+< verbo_are --> tipo_de_tema >.
+< irregular_comparativo_indeclinavel --> tipo_de_tema >.
+< irregular_participio_perfeito_1 --> tipo_de_tema >.
+< demonstrativo --> tipo_de_tema >.
+< pronome_1 --> tipo_de_tema >.
+< pronome_2 --> tipo_de_tema >.
+< us_i --> tipo_de_tema >.
+
+// --- Morfologia especial ---
+< indeclinavel --> morfologia >.
+< irregular_comparativo_indeclinavel --> morfologia >.
+
+// --- Tipo de Derivação ---
+< verbo_are --> tipo_derivacao >.
+
+// --- Classe Gramatical (valores) ---
+// Os tipos (substantivo, verbo, etc.) são declarados como entidades linguísticas.
+// Aqui eles são reutilizados como valores possíveis do atributo classe_gramatical.
+< substantivo --> classe_gramatical >.
+< verbo --> classe_gramatical >.
+< adjetivo --> classe_gramatical >.
+< adverbio --> classe_gramatical >.
+< preposicao --> classe_gramatical >.
+< conjuncao --> classe_gramatical >.
+< pronome --> classe_gramatical >.
+< interjeicao --> classe_gramatical >.
+
+// ============================================================================
+// 6. RELAÇÕES DE INERÊNCIA: ATRIBUTOS GRAMATICAIS INEREM NA INSTÂNCIA PALAVRA
+// ============================================================================
+
+// Cada instância de palavra (token material) é portadora de qualidades gramaticais.
+// A relação correta em BFO é 'inheres_in' (qualidade inere no seu portador).
+
+< (instancia_palavra * caso) --> inheres_in >.
+< (instancia_palavra * numero) --> inheres_in >.
+< (instancia_palavra * genero) --> inheres_in >.
+< (instancia_palavra * modo) --> inheres_in >.
+< (instancia_palavra * tempo) --> inheres_in >.
+< (instancia_palavra * voz) --> inheres_in >.
+< (instancia_palavra * pessoa) --> inheres_in >.
+< (instancia_palavra * declinacao) --> inheres_in >.
+< (instancia_palavra * tipo_de_tema) --> inheres_in >.
+< (instancia_palavra * morfologia) --> inheres_in >.
+< (instancia_palavra * tipo_derivacao) --> inheres_in >.
+< (instancia_palavra * classe_gramatical) --> inheres_in >.
+< (instancia_palavra * lema) --> inheres_in >.
+
+// Afirmação genérica: todo atributo gramatical inere em alguma instância_palavra.
+< (atributo_gramatical * instancia_palavra) --> inheres_in >.
+
+// ============================================================================
+// 7. NOTA SOBRE INFERÊNCIAS E RELAÇÕES DENOTACIONAIS
+// ============================================================================
+// As relações denota, descreve, modifica, mapeia_para são intencionais e não
+// implicam reclassificação ontológica. Para uso em raciocínio, futuras versões
+// podem definir axiomas all-some, por exemplo:
+//
+//   substantivo denota continuant ≡
+//     ∀t (t instance_of substantivo → ∃c (c instance_of continuant ∧ t denota c))
+//
+// Tais axiomas requerem quantificação de segunda ordem, não suportada diretamente
+// em NAL básico. Portanto, estas relações permanecem como primitivas neste arquivo.
+
+// --- FIM DA EXTENSÃO CORRIGIDA ---
