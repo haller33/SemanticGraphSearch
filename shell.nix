@@ -9,6 +9,7 @@ let
     cjson
     uthash
     curl            # <-- added for send2graph.c compilation
+    librdf_raptor2  # <-- for adding RDF extensions checker
   ];
   libPath = pkgs.lib.makeLibraryPath runtimeDeps;
 
@@ -28,7 +29,8 @@ pkgs.mkShell {
     python3
     luaWithSqlite
     curl            # <-- added for send2graph.c compilation
-    pkg-config        # helpful for finding cflags/ldflags
+    pkg-config      # helpful for finding cflags/ldflags
+    librdf_raptor2  # <-- rdf / turtle checker
   ];
 
   # Libraries for compiling/linking (C/C++)
