@@ -103,7 +103,8 @@
 // Metadata inherence
 <(metadata * multimedia_object) --> inheres_in>.
 // A multimedia object contains metadata values (as qualities)
-< ((metadata) * (e.g., "1920x1080")) --> has_value >. // Use Narsese product for specific value
+// < ((metadata) * (e.g., "1920x1080")) --> has_value >.
+// Use Narsese product for specific value
 
 // --- PROCESSES RELATED TO MULTIMEDIA (occurents) ---
 <playback --> process>.
@@ -139,13 +140,64 @@
 
 // --- INFERENCE RULES (optional) ---
 // If a file has format X, it inherits properties of that format
-< <$1 --> (has_format * $2)> ==> <$1 --> ($2 * type)>>.  // Placeholder, not fully formal
+// Placeholder, not fully formal
+< <$1 --> (has_format * $2)> ==> <$1 --> ($2 * type)>>.
 // If a process participates in a multimedia object, it uses its format
 < (&&, < $1 --> playback >, <($1 * $2) --> participates_in>, <$2 --> (has_format * $3)>) ==> <($1 * $3) --> uses_format> >.
 
 // --- EXTENSION FOR FILESYSTEM HIERARCHY ---
 // Add path depth and root concepts
+// <root_folder --> folder>.
+// <((folder * folder) --> subfolder_of) ==> <(folder * root_folder) --> under_root>>.
+
+// --- EXTENSION FOR FILESYSTEM HIERARCHY (UNIX/Linux) ---
 <root_folder --> folder>.
-<((folder * folder) --> subfolder_of) ==> <(folder * root_folder) --> under_root>>.
+
+// Proper subfolder relation with variable
+<<$1 --> folder> && <($1 * root_folder) --> subfolder_of>> ==> <($1 * root_folder) --> under_root>>.
+
+// Transitive subfolder relation (optional, enables deeper paths)
+<<$1 --> folder> && <$2 --> folder> && <($1 * $2) --> subfolder_of> && <($2 * $3) --> subfolder_of>> ==> <($1 * $3) --> subfolder_of>>.
+
+// UNIX inodes
+<inode --> generically_dependent_continuan>.
+<(file * inode) --> has_inode>.
+
+// File metadata (permissions, owner, etc.)
+<file_metadata --> specifically_dependent_continua>.
+<permissions --> file_metadata>.
+<owner --> file_metadata>.
+<group --> file_metadata>.
+<timestamps --> file_metadata>.
+
+// Links
+<symbolic_link --> file>.
+<hard_link --> file>.
+<(symbolic_link * file) --> points_to>.
+<(hard_link * inode) --> shares_inode>.
+
+// Mount points
+<mount_point --> folder>.
+<(mount_point * file_system) --> mounts>.
+
+// File operations (processes)
+<open --> process>.
+<read --> process>.
+<write --> process>.
+<close --> process>.
+<(open * file) --> operates_on>.
+<(read * file) --> operates_on>.
+<(write * file) --> operates_on>.
+
+// Permission qualities
+<read_permission --> quality>.
+<write_permission --> quality>.
+<execute_permission --> quality>.
+<(read_permission * file) --> inheres_in>.
+<(write_permission * file) --> inheres_in>.
+<(execute_permission * file) --> inheres_in>.
+
+// --- END OF UNIX/LINUX EXTENSION ---
 
 // --- END OF MULTIMEDIA ONTOLOGIES EXTENSION ---
+

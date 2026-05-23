@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-sed 's/>. Priority=.*/>./g' |
-    head -n -18 |
-    cut -d':' -f2-|
-    grep -v '^$'
+stdbuf -oL sed 's/>. Priority=.*/>./g' |
+    stdbuf -oL head -n -18 |
+    stdbuf -oL cut -d':' -f2-|
+    stdbuf -oL grep -v '^$'

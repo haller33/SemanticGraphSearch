@@ -16,14 +16,14 @@ done
 
 if [ "$PLAIN_NAL" -eq 1 ]; then
     MORPHLIB=morpheus-perseids/stemlib morpheus-perseids/bin/morpheus -L "$1" |
-        uv run python morphology_to_nal.py
+        uv run python ./src/python/morphology_to_nal.py
 elif [ "$ONLY_GRAPH" -eq 1 ]; then
     
     MORPHLIB=morpheus-perseids/stemlib morpheus-perseids/bin/morpheus -L "$1" |
-        uv run python morphology_to_nal.py |
+        uv run python ./src/python/morphology_to_nal.py |
         python3 narsese2json.v3.py --tag input |
         uv run --with requests python send2graph.py
 else
     MORPHLIB=morpheus-perseids/stemlib morpheus-perseids/bin/morpheus -L "$1" |
-        uv run python morphology_to_nal.py >> input.nal
+        uv run python ./src/python/morphology_to_nal.py >> input.nal
 fi 
