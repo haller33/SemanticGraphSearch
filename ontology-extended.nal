@@ -1,6 +1,7 @@
 // --- EXTENSÃO LINGUÍSTICA PARA BFO (NAL) ---
 // CORRIGIDA CONFORME BFO 2.0
 // Remove inferências inválidas que violam a distinção entre categorias BFO.
+
 // Relações como denota, descreve, modifica, mapeia_para são declaradas como primitivas
 // e devem ser definidas futuramente com axiomas all-some (não implementados aqui).
 
@@ -44,18 +45,24 @@
 < (preposicao * temporal_region) --> mapeia_para >.
 
 // ============================================================================
-// 3. BASE: TIPO PALAVRA E INSTÂNCIA MATERIAL
+// 3. BASE: TIPO PALAVRA, PADRÃO FÍSICO E INSTÂNCIA MATERIAL
 // ============================================================================
 
 // Tipo palavra (genericamente dependente) – já implícito em entidade_linguistica.
 // Declarado explicitamente para clareza.
 < palavra --> entidade_linguistica >.
 
-// Instância concreta da palavra (token material)
+// Padrão físico ou marca (dependente específico) que carrega a informação
+< padrao_fisico_da_palavra --> specifically_dependent_continuant >.
+
+// Instância concreta da palavra (token material / portador)
 < instancia_palavra --> material_entity >.
 
-// Relação de concretização: o token material concretiza o tipo palavra
-< (instancia_palavra * palavra) --> concretiza >.
+// Relação de concretização: o tipo palavra (GDC) concretiza-se no padrão físico (SDC)
+< (palavra * padrao_fisico_da_palavra) --> concretized_in >.
+
+// Relação de inerência: o padrão físico (SDC) inere na instância material
+< (padrao_fisico_da_palavra * instancia_palavra) --> inheres_in >.
 
 // ============================================================================
 // 4. ATRIBUTOS GRAMATICAIS COMO DEPENDENTES ESPECÍFICOS (QUALIDADES)
@@ -198,13 +205,15 @@
 // 7. NOTA SOBRE INFERÊNCIAS E RELAÇÕES DENOTACIONAIS
 // ============================================================================
 // As relações denota, descreve, modifica, mapeia_para são intencionais e não
-// implicam reclassificação ontológica. Para uso em raciocínio, futuras versões
+// implicam reclassificação ontológica.
+// Para uso em raciocínio, futuras versões
 // podem definir axiomas all-some, por exemplo:
 //
 //   substantivo denota continuant ≡
 //     ∀t (t instance_of substantivo → ∃c (c instance_of continuant ∧ t denota c))
 //
 // Tais axiomas requerem quantificação de segunda ordem, não suportada diretamente
-// em NAL básico. Portanto, estas relações permanecem como primitivas neste arquivo.
+// em NAL básico.
+// Portanto, estas relações permanecem como primitivas neste arquivo.
 
 // --- FIM DA EXTENSÃO CORRIGIDA ---
